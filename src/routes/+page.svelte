@@ -384,6 +384,29 @@
   }
 
   // ============================================================
+  // SCREENSHOT
+  // ============================================================
+
+  async function handleScreenshot() {
+    // Ẩn tạm thời toolbar để không bị chụp dính vào ảnh
+    isDrawingMode.set(false);
+    
+    // Đợi UI cập nhật (100ms)
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    try {
+      const path = await invoke('take_screenshot');
+      showToast(`Đã lưu ảnh chụp màn hình tại: ${path}`);
+    } catch (e) {
+      console.error(e);
+      showToast(`Lỗi chụp ảnh: ${e}`);
+    } finally {
+      // Hiện lại toolbar
+      isDrawingMode.set(true);
+    }
+  }
+
+  // ============================================================
   // KEYBOARD SHORTCUTS (Frontend-level)
   // ============================================================
 
@@ -458,6 +481,7 @@
   onUndo={handleUndo}
   onRedo={handleRedo}
   onClear={handleClear}
+  onScreenshot={handleScreenshot}
   onToggleMode={toggleDrawMode}
 />
 

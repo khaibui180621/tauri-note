@@ -28,6 +28,7 @@
   export let onUndo: () => void = () => {};
   export let onRedo: () => void = () => {};
   export let onClear: () => void = () => {};
+  export let onScreenshot: () => void = () => {};
   // Toggle mode được xử lý từ parent (+page.svelte) để gọi invoke Rust
   export let onToggleMode: () => void = () => {};
 
@@ -182,6 +183,20 @@
       >
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
           <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+        </svg>
+      </button>
+
+      <div class="divider" aria-hidden="true" style="height: 16px; margin: 0 2px;"></div>
+
+      <button
+        id="btn-screenshot"
+        class="btn-action"
+        on:click={onScreenshot}
+        title="Chụp ảnh màn hình"
+        aria-label="Chụp ảnh màn hình"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+          <path d="M21 4H16.83L15 2H9L7.17 4H3C1.9 4 1 4.9 1 6V20C1 21.1 1.9 22 3 22H21C22.1 22 23 21.1 23 20V6C23 4.9 22.1 4 21 4ZM21 20H3V6H7.05L8.88 4H15.12L16.95 6H21V20ZM12 7C9.24 7 7 9.24 7 12C7 14.76 9.24 17 12 17C14.76 17 17 14.76 17 12C17 9.24 14.76 7 12 7ZM12 15C10.35 15 9 13.65 9 12C9 10.35 10.35 9 12 9C13.65 9 15 10.35 15 12C15 13.65 13.65 15 12 15Z"/>
         </svg>
       </button>
     </div>

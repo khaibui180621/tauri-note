@@ -56,6 +56,64 @@ fn set_draw_mode(state: tauri::State<AppState>, enabled: bool) {
     *state.is_drawing_mode.lock().unwrap() = enabled;
 }
 
+/// Chụp ảnh màn hình hiện tại (chỗ này dùng screencapture cho macOS, xcap cho Windows/Linux)
+#[tauri::command]
+fn take_screenshot() -> Result<String, String> {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    let start = SystemTime::now();
+    let since_the_epoch = start.duration_since(UNIX_EPOCH).expect("Time went backwards");
+    let home = std::env::var("USERPROFILE").or_else(|_| std::env::var("HOME")).unwrap_or_else(|_| ".".to_string());
+    let desktop_dir = format!("{}/Desktop", home);
+
+    #[cfg(target_os = "macos")]
+    {
+        use std::process::Command;
+        
+        let path = format!("{}/ScreenNote_{}.png", desktop_dir, since_the_epoch.as_secs());
+        let output = Command::new("screencapture")
+            .arg("-x") // Không phát âm thanh
+            .arg(&path)
+            .output()
+            .map_err(|e| e.to_string())?;
+
+        if output.status.success() {
+            return Ok(path);
+        } else {
+            return Err(String::from_utf8_lossy(&output.stderr).to_string());
+        }
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        // Sử dụng xcap cho Windows / Linux
+        use xcap::Monitor;
+        
+        let monitors = Monitor::all().map_err(|e| e.to_string())?;
+        if monitors.is_empty() {
+            return Err("Không tìm thấy màn hình nào để chụp".to_string());
+        }
+        
+        // Chụp tất cả màn hình, lưu thành từng file nếu có nhiều màn hình
+        let mut saved_paths = Vec::new();
+        for (i, monitor) in monitors.iter().enumerate() {
+            let image = monitor.capture_image().map_err(|e| e.to_string())?;
+            
+            let path = if monitors.len() > 1 {
+                format!("{}/ScreenNote_{}_monitor{}.png", desktop_dir, since_the_epoch.as_secs(), i)
+            } else {
+                format!("{}/ScreenNote_{}.png", desktop_dir, since_the_epoch.as_secs())
+            };
+            
+            image.save(&path).map_err(|e| e.to_string())?;
+            saved_paths.push(path);
+        }
+        
+        // Trả về đường dẫn file đầu tiên (hoặc nhiều file gộp lại)
+        Ok(saved_paths.join(", "))
+    }
+}
+
 // ============================================================
 // APP STATE
 // ============================================================
@@ -90,6 +148,7 @@ pub fn run() {
             set_click_through,
             get_draw_mode,
             set_draw_mode,
+            take_screenshot,
         ])
         .run(tauri::generate_context!())
         .expect("Lỗi khởi động ScreenNote Overlay");
