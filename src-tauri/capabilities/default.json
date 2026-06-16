@@ -1,0 +1,20 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Capability for the main ScreenNote Overlay window",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-set-ignore-cursor-events",
+    "core:window:allow-set-always-on-top",
+    "core:window:allow-set-focus",
+    "core:window:allow-set-background-color",
+    "core:tray:allow-new",
+    "core:tray:allow-set-tooltip",
+    "core:tray:allow-set-icon",
+    "core:tray:allow-set-visible",
+    "core:tray:allow-set-menu",
+    "core:menu:allow-new",
+    "core:menu:allow-append"
+  ]
+}

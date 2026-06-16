@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="%sveltekit.assets%/favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="ScreenNote Overlay — Vẽ và ghi chú trực tiếp lên màn hình" />
+    <title>ScreenNote Overlay</title>
+    %sveltekit.head%
+  </head>
+  <!--
+    data-sveltekit-preload-data="off": tắt preload vì đây là desktop app, không cần.
+    style: background transparent bắt buộc cho overlay.
+  -->
+  <body style="background: transparent;" data-sveltekit-preload-data="off">
+    <div style="display: contents">%sveltekit.body%</div>
+  </body>
+</html>
