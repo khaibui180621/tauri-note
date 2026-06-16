@@ -46,5 +46,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://updates.screennote.com/{{target}}/{{current_version}}"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDg3OUY4MDM1ODI1NjA4RgpSV1NQWUNWWUEvaDVDRGNmM3B0TVJxRDR3VjMwd0lXbXpPUjIwUTViUFg2akJETUEwU1UxN0tDdAo="
+    }
   }
 }

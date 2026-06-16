@@ -35,10 +35,7 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut,
 ///
 /// NOTE: Tauri v2 — `set_ignore_cursor_events` thuộc core window permission.
 #[tauri::command]
-async fn set_click_through(
-    window: WebviewWindow,
-    enabled: bool,
-) -> Result<(), String> {
+async fn set_click_through(window: WebviewWindow, enabled: bool) -> Result<(), String> {
     window
         .set_ignore_cursor_events(enabled)
         .map_err(|e| format!("Lỗi khi thay đổi chế độ click-through: {}", e))
@@ -62,15 +59,23 @@ fn take_screenshot() -> Result<String, String> {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     let start = SystemTime::now();
-    let since_the_epoch = start.duration_since(UNIX_EPOCH).expect("Time went backwards");
-    let home = std::env::var("USERPROFILE").or_else(|_| std::env::var("HOME")).unwrap_or_else(|_| ".".to_string());
+    let since_the_epoch = start
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards");
+    let home = std::env::var("USERPROFILE")
+        .or_else(|_| std::env::var("HOME"))
+        .unwrap_or_else(|_| ".".to_string());
     let desktop_dir = format!("{}/Desktop", home);
 
     #[cfg(target_os = "macos")]
     {
         use std::process::Command;
-        
-        let path = format!("{}/ScreenNote_{}.png", desktop_dir, since_the_epoch.as_secs());
+
+        let path = format!(
+            "{}/ScreenNote_{}.png",
+            desktop_dir,
+            since_the_epoch.as_secs()
+        );
         let output = Command::new("screencapture")
             .arg("-x") // Không phát âm thanh
             .arg(&path)
@@ -88,27 +93,36 @@ fn take_screenshot() -> Result<String, String> {
     {
         // Sử dụng xcap cho Windows / Linux
         use xcap::Monitor;
-        
+
         let monitors = Monitor::all().map_err(|e| e.to_string())?;
         if monitors.is_empty() {
             return Err("Không tìm thấy màn hình nào để chụp".to_string());
         }
-        
+
         // Chụp tất cả màn hình, lưu thành từng file nếu có nhiều màn hình
         let mut saved_paths = Vec::new();
         for (i, monitor) in monitors.iter().enumerate() {
             let image = monitor.capture_image().map_err(|e| e.to_string())?;
-            
+
             let path = if monitors.len() > 1 {
-                format!("{}/ScreenNote_{}_monitor{}.png", desktop_dir, since_the_epoch.as_secs(), i)
+                format!(
+                    "{}/ScreenNote_{}_monitor{}.png",
+                    desktop_dir,
+                    since_the_epoch.as_secs(),
+                    i
+                )
             } else {
-                format!("{}/ScreenNote_{}.png", desktop_dir, since_the_epoch.as_secs())
+                format!(
+                    "{}/ScreenNote_{}.png",
+                    desktop_dir,
+                    since_the_epoch.as_secs()
+                )
             };
-            
+
             image.save(&path).map_err(|e| e.to_string())?;
             saved_paths.push(path);
         }
-        
+
         // Trả về đường dẫn file đầu tiên (hoặc nhiều file gộp lại)
         Ok(saved_paths.join(", "))
     }
@@ -131,6 +145,8 @@ struct AppState {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         // --- Plugins ---
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
@@ -179,7 +195,8 @@ fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 /// - Ẩn khỏi Dock trên macOS
 /// - Cho phép overlay hiển thị trên fullscreen apps (macOS NSWindowCollectionBehavior)
 fn setup_window(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
-    let window = app.get_webview_window("main")
+    let window = app
+        .get_webview_window("main")
         .ok_or("Không tìm thấy cửa sổ 'main'")?;
 
     // Đảm bảo cửa sổ luôn nổi trên cùng
@@ -201,7 +218,8 @@ fn setup_window(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> 
 
         // Lấy NSWindow handle (con trỏ *mut Object của Objective-C)
         // window.ns_window() trả về *mut c_void trên macOS
-        let ns_window_ptr = window.ns_window()
+        let ns_window_ptr = window
+            .ns_window()
             .map_err(|e| format!("Không lấy được ns_window: {}", e))?;
 
         // NSWindowCollectionBehavior flags (raw numeric):
@@ -215,7 +233,7 @@ fn setup_window(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> 
         let behavior: u64 = (1 << 0)   // CanJoinAllSpaces
                           | (1 << 4)   // Stationary
                           | (1 << 6)   // IgnoresCycle
-                          | (1 << 8);  // FullScreenAuxiliary
+                          | (1 << 8); // FullScreenAuxiliary
 
         unsafe {
             let ns_window = &mut *(ns_window_ptr as *mut AnyObject);
@@ -231,7 +249,8 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let app_handle = app.handle();
 
     // Tạo menu items
-    let toggle_item = MenuItem::with_id(app_handle, "toggle", "Hiện/Ẩn Toolbar", true, None::<&str>)?;
+    let toggle_item =
+        MenuItem::with_id(app_handle, "toggle", "Hiện/Ẩn Toolbar", true, None::<&str>)?;
     let quit_item = MenuItem::with_id(app_handle, "quit", "Thoát ScreenNote", true, None::<&str>)?;
 
     let menu = Menu::with_items(app_handle, &[&toggle_item, &quit_item])?;
@@ -298,20 +317,26 @@ fn setup_global_shortcut(app_handle: AppHandle) -> Result<(), Box<dyn std::error
     let shortcut_label = "Ctrl+Shift+D";
 
     // Đăng ký với global shortcut plugin
-    let result = app_handle.global_shortcut().on_shortcut(shortcut, move |app, _shortcut, event| {
-        // Chỉ xử lý khi nhấn xuống (tránh trigger 2 lần)
-        if event.state() == ShortcutState::Pressed {
-            if let Some(window) = app.get_webview_window("main") {
-                // Gửi event "toggle-draw-mode" tới frontend
-                // Frontend sẽ tự xử lý việc đảo trạng thái
-                let _ = window.emit("toggle-draw-mode", ());
-            }
-        }
-    });
+    let result =
+        app_handle
+            .global_shortcut()
+            .on_shortcut(shortcut, move |app, _shortcut, event| {
+                // Chỉ xử lý khi nhấn xuống (tránh trigger 2 lần)
+                if event.state() == ShortcutState::Pressed {
+                    if let Some(window) = app.get_webview_window("main") {
+                        // Gửi event "toggle-draw-mode" tới frontend
+                        // Frontend sẽ tự xử lý việc đảo trạng thái
+                        let _ = window.emit("toggle-draw-mode", ());
+                    }
+                }
+            });
 
     match result {
         Ok(_) => {
-            eprintln!("[ScreenNote] Đã đăng ký phím tắt {} thành công", shortcut_label);
+            eprintln!(
+                "[ScreenNote] Đã đăng ký phím tắt {} thành công",
+                shortcut_label
+            );
         }
         Err(e) => {
             // Phím tắt bị chiếm dụng hoặc lỗi khác — KHÔNG crash
@@ -320,7 +345,10 @@ fn setup_global_shortcut(app_handle: AppHandle) -> Result<(), Box<dyn std::error
             if let Some(window) = app_handle.get_webview_window("main") {
                 let _ = window.emit(
                     "shortcut-register-failed",
-                    format!("Phím tắt {} đã bị phần mềm khác chiếm dụng: {}", shortcut_label, e),
+                    format!(
+                        "Phím tắt {} đã bị phần mềm khác chiếm dụng: {}",
+                        shortcut_label, e
+                    ),
                 );
             }
         }

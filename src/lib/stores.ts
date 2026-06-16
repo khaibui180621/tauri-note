@@ -12,7 +12,7 @@ import { writable, derived, get } from 'svelte/store';
 // TYPES
 // ============================================================
 
-export type Tool = 'pen' | 'eraser';
+export type Tool = 'pen' | 'eraser' | 'text';
 
 export interface DrawingState {
   imageData: ImageData | null;
@@ -71,6 +71,7 @@ export const canvasCursor = derived(
   ([$isDrawingMode, $currentTool]) => {
     if (!$isDrawingMode) return 'default';
     if ($currentTool === 'eraser') return 'cell';
+    if ($currentTool === 'text') return 'text';
     return 'crosshair';
   }
 );

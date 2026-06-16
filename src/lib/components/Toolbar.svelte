@@ -144,6 +144,19 @@
           <path d="M15.14 3c-.51 0-1.02.2-1.41.59L2.59 14.73c-.78.77-.78 2.04 0 2.83L5.03 20h7.66l8.72-8.72c.78-.77.78-2.04 0-2.83l-4.86-4.86C16.16 3.2 15.65 3 15.14 3zM6.21 19l-2.1-2.1 5-5 2.12 2.12L6.21 19z"/>
         </svg>
       </button>
+      <button
+        id="btn-text"
+        class="btn-tool"
+        class:active={$currentTool === 'text'}
+        on:click={() => selectTool('text')}
+        title="Văn bản (T)"
+        aria-pressed={$currentTool === 'text'}
+        aria-label="Văn bản"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+          <path d="M5 4v3h5.5v12h3V7H19V4z"/>
+        </svg>
+      </button>
     </div>
 
     <div class="divider" aria-hidden="true"></div>

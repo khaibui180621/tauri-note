@@ -21,6 +21,8 @@
   import { onMount, onDestroy } from 'svelte';
   import { listen, type UnlistenFn } from '@tauri-apps/api/event';
   import { invoke } from '@tauri-apps/api/core';
+  import { check } from '@tauri-apps/plugin-updater';
+  import { relaunch } from '@tauri-apps/plugin-process';
   import Toolbar from '$lib/components/Toolbar.svelte';
   import {
     isDrawingMode,
@@ -57,10 +59,66 @@
   let pendingY = 0;
   let hasPendingDraw = false;
 
+  // ============================================================
+  // TEXT TOOL STATE
+  // ============================================================
+  
+  let textInputVisible = false;
+  let textInputX = 0;
+  let textInputY = 0;
+  let textInputValue = '';
+  let textInputRef: HTMLInputElement;
+
+  function commitText() {
+    if (!textInputVisible) return;
+    if (textInputValue.trim() !== '') {
+      const snapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      pushUndoState(snapshot);
+
+      const fontSize = $brushSize * 4 + 10;
+      ctx.font = `${fontSize}px Inter, sans-serif`;
+      ctx.fillStyle = $currentColor;
+      ctx.textBaseline = 'top';
+      ctx.fillText(textInputValue, textInputX, textInputY + 2);
+    }
+    textInputVisible = false;
+    textInputValue = '';
+  }
+
   // Toast notification state
   let toastMessage = '';
   let toastVisible = false;
   let toastTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // ============================================================
+  // UPDATER STATE
+  // ============================================================
+  let updateAvailable: any = null;
+  let isUpdating = false;
+
+  async function checkForUpdates() {
+    try {
+      const update = await check();
+      if (update) {
+        updateAvailable = update;
+      }
+    } catch (e) {
+      console.error('[ScreenNote] Update check error:', e);
+    }
+  }
+
+  async function installUpdate() {
+    if (!updateAvailable) return;
+    isUpdating = true;
+    try {
+      await updateAvailable.downloadAndInstall();
+      await relaunch();
+    } catch (e) {
+      console.error('[ScreenNote] Lỗi khi cập nhật:', e);
+      showToast('Lỗi cập nhật: ' + e);
+      isUpdating = false;
+    }
+  }
 
   // ============================================================
   // TAURI EVENT LISTENERS
@@ -99,6 +157,9 @@
 
     // Keyboard shortcuts (frontend-level)
     window.addEventListener('keydown', handleKeyboard);
+
+    // Check update on startup
+    checkForUpdates();
   });
 
   onDestroy(() => {
@@ -163,6 +224,19 @@
    */
   function handlePointerDown(e: PointerEvent) {
     if (!$isDrawingMode) return;
+
+    if ($currentTool === 'text') {
+      if (textInputVisible) {
+        commitText();
+      }
+      const { x, y } = getCanvasPos(e);
+      textInputX = x;
+      textInputY = y;
+      textInputValue = '';
+      textInputVisible = true;
+      setTimeout(() => textInputRef?.focus(), 0);
+      return;
+    }
 
     isPointerDown = true;
 
@@ -411,7 +485,23 @@
   // ============================================================
 
   function handleKeyboard(e: KeyboardEvent) {
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      if (e.key === 'Escape') {
+         // Hủy nhập text
+         textInputVisible = false;
+         textInputValue = '';
+      }
+      return; // Bỏ qua phím tắt nếu đang gõ text
+    }
+
     const ctrl = e.ctrlKey || e.metaKey;
+
+    // Phím tắt đổi tool:
+    if (!ctrl && !e.shiftKey) {
+      if (e.key.toLowerCase() === 'p') currentTool.set('pen');
+      if (e.key.toLowerCase() === 'e') currentTool.set('eraser');
+      if (e.key.toLowerCase() === 't') currentTool.set('text');
+    }
 
     // Ctrl+Z: Undo
     if (ctrl && e.key === 'z' && !e.shiftKey) {
@@ -476,6 +566,49 @@
   aria-label="Drawing canvas"
 ></canvas>
 
+<!-- Update Notification -->
+{#if updateAvailable}
+  <div class="update-popup">
+    <div class="update-content">
+      <strong>Bản cập nhật mới có sẵn!</strong>
+      <p>Phiên bản {updateAvailable.version} đã sẵn sàng.</p>
+    </div>
+    <div class="update-actions">
+      <button class="btn-update" disabled={isUpdating} on:click={installUpdate}>
+        {isUpdating ? 'Đang tải...' : 'Cập nhật ngay'}
+      </button>
+      <button class="btn-close" disabled={isUpdating} on:click={() => updateAvailable = null}>
+        Bỏ qua
+      </button>
+    </div>
+  </div>
+{/if}
+
+{#if textInputVisible}
+  <input
+    bind:this={textInputRef}
+    bind:value={textInputValue}
+    on:blur={commitText}
+    on:keydown={(e) => { if (e.key === 'Enter') commitText() }}
+    style="
+      position: fixed;
+      left: {textInputX}px;
+      top: {textInputY}px;
+      color: {$currentColor};
+      font-size: {$brushSize * 4 + 10}px;
+      font-family: Inter, sans-serif;
+      background: transparent;
+      border: 1px dashed rgba(255,255,255,0.5);
+      outline: none;
+      padding: 0;
+      margin: 0;
+      line-height: 1;
+      z-index: 10;
+      min-width: 100px;
+    "
+  />
+{/if}
+
 <!-- Toolbar: chỉ render khi ở drawing mode, tự ẩn khi pass-through -->
 <Toolbar
   onUndo={handleUndo}
@@ -528,12 +661,75 @@
     font-weight: 500;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
     pointer-events: none;
-    animation: toast-in 0.25s ease both;
+    border-radius: 8px;
+    z-index: 10000;
+    animation: slide-down 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
-  @keyframes toast-in {
-    from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+  /* ==========================================================
+     UPDATE NOTIFICATION
+     ========================================================== */
+  .update-popup {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 10000;
+    background: rgba(18, 18, 24, 0.9);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 16px;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    animation: fade-in-right 0.3s ease;
+  }
+  .update-content strong {
+    font-size: 14px;
+    color: #4ade80;
+  }
+  .update-content p {
+    margin: 4px 0 0 0;
+    font-size: 12px;
+    color: rgba(255,255,255,0.7);
+  }
+  .update-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+  .btn-update {
+    background: #0074D9;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .btn-update:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .btn-close {
+    background: transparent;
+    color: rgba(255,255,255,0.7);
+    border: 1px solid rgba(255,255,255,0.2);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  @keyframes fade-in-right {
+    from { opacity: 0; transform: translateX(20px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  @keyframes slide-down {
+    from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
     to { opacity: 1; transform: translateX(-50%) translateY(0); }
   }
-
 </style>
